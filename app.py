@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import streamlit as st
+model = load_model("models/traffic_sign_cnn.keras")
 
 from PIL import Image
 from tensorflow.keras.models import load_model

@@ -1,8 +1,4 @@
-tensorflow==2.20.0
-numpy
-pandas
-opencv-python
-matplotlib
-scikit-learn
-Pillow
 streamlit
+tensorflow==2.21.0
+numpy
+pillow

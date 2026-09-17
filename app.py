@@ -1,22 +1,12 @@
-import cv2
-import numpy as np
 import streamlit as st
-model = load_model("models/traffic_sign_cnn.keras")
-
+import numpy as np
 from PIL import Image
 from tensorflow.keras.models import load_model
 
-from src.config import (
-    MODEL_PATH,
-    CLASS_NAMES_PATH,
-    IMG_HEIGHT,
-    IMG_WIDTH
-)
 
-
-# -----------------------------
+# --------------------------------------------------
 # Page Configuration
-# -----------------------------
+# --------------------------------------------------
 
 st.set_page_config(
     page_title="Traffic Sign Recognition",
@@ -25,104 +15,117 @@ st.set_page_config(
 )
 
 
-# -----------------------------
-# Load Class Names
-# -----------------------------
+# --------------------------------------------------
+# Load Trained Model
+# --------------------------------------------------
 
 @st.cache_resource
-def load_class_names():
-
-    with open(
-        CLASS_NAMES_PATH,
-        "r",
-        encoding="utf-8"
-    ) as file:
-
-        return [
-            line.strip()
-            for line in file.readlines()
-        ]
+def load_trained_model():
+    return load_model("models/traffic_sign_cnn.keras")
 
 
-# -----------------------------
-# Load Model
-# -----------------------------
-
-@st.cache_resource
-def load_cnn_model():
-
-    return load_model(
-        MODEL_PATH
-    )
+model = load_trained_model()
 
 
-# -----------------------------
-# Preprocess Image
-# -----------------------------
+# --------------------------------------------------
+# Traffic Sign Classes
+# --------------------------------------------------
+
+class_names = [
+    "Speed limit (20km/h)",
+    "Speed limit (30km/h)",
+    "Speed limit (50km/h)",
+    "Speed limit (60km/h)",
+    "Speed limit (70km/h)",
+    "Speed limit (80km/h)",
+    "End of speed limit (80km/h)",
+    "Speed limit (100km/h)",
+    "Speed limit (120km/h)",
+    "No passing",
+    "No passing for vehicles over 3.5 metric tons",
+    "Right-of-way at the next intersection",
+    "Priority road",
+    "Yield",
+    "Stop",
+    "No vehicles",
+    "Vehicles over 3.5 metric tons prohibited",
+    "No entry",
+    "General caution",
+    "Dangerous curve to the left",
+    "Dangerous curve to the right",
+    "Double curve",
+    "Bumpy road",
+    "Slippery road",
+    "Road narrows on the right",
+    "Road work",
+    "Traffic signals",
+    "Pedestrians",
+    "Children crossing",
+    "Bicycles crossing",
+    "Beware of ice/snow",
+    "Wild animals crossing",
+    "End of all speed and passing limits",
+    "Turn right ahead",
+    "Turn left ahead",
+    "Ahead only",
+    "Go straight or right",
+    "Go straight or left",
+    "Keep right",
+    "Keep left",
+    "Roundabout mandatory",
+    "End of no passing",
+    "End of no passing by vehicles over 3.5 metric tons"
+]
+
+
+# --------------------------------------------------
+# Image Preprocessing
+# --------------------------------------------------
 
 def preprocess_image(image):
 
+    # Convert image to RGB
+    image = image.convert("RGB")
+
+    # Resize to the same size used during training
+    image = image.resize((32, 32))
+
+    # Convert to NumPy array
     image = np.array(image)
 
-    # Convert RGB to BGR for OpenCV
-    image = cv2.cvtColor(
-        image,
-        cv2.COLOR_RGB2BGR
-    )
-
-    image = cv2.resize(
-        image,
-        (IMG_WIDTH, IMG_HEIGHT)
-    )
-
-    # Convert back to RGB
-    image = cv2.cvtColor(
-        image,
-        cv2.COLOR_BGR2RGB
-    )
-
-    # Normalize
-    image = image.astype(
-        np.float32
-    ) / 255.0
+    # Normalize pixel values
+    image = image / 255.0
 
     # Add batch dimension
-    image = np.expand_dims(
-        image,
-        axis=0
-    )
+    image = np.expand_dims(image, axis=0)
 
     return image
 
 
-# -----------------------------
-# Application
-# -----------------------------
+# --------------------------------------------------
+# Streamlit UI
+# --------------------------------------------------
 
 st.title("🚦 Traffic Sign Recognition")
 
 st.write(
-    "Upload a traffic sign image and "
-    "the CNN model will predict the sign."
+    "Upload a traffic sign image and the CNN model "
+    "will predict the traffic sign."
 )
-
-st.divider()
 
 uploaded_file = st.file_uploader(
-    "Upload Traffic Sign Image",
-    type=[
-        "jpg",
-        "jpeg",
-        "png"
-    ]
+    "Upload a traffic sign image",
+    type=["jpg", "jpeg", "png"]
 )
 
+
+# --------------------------------------------------
+# Prediction
+# --------------------------------------------------
 
 if uploaded_file is not None:
 
-    image = Image.open(
-        uploaded_file
-    ).convert("RGB")
+    image = Image.open(uploaded_file)
 
     st.image(
         image,
@@ -130,66 +133,50 @@ if uploaded_file is not None:
         width=300
     )
 
-    st.divider()
+    if st.button("🔍 Predict Traffic Sign"):
 
-    if st.button(
-        "🔍 Predict Traffic Sign"
-    ):
+        processed_image = preprocess_image(image)
 
-        try:
+        predictions = model.predict(processed_image, verbose=0)
 
-            model = load_cnn_model()
-            class_names = load_class_names()
+        predicted_class = np.argmax(predictions[0])
 
-            processed_image = preprocess_image(
-                image
+        confidence = float(
+            predictions[0][predicted_class] * 100
+        )
+
+        predicted_sign = class_names[predicted_class]
+
+        st.success(
+            f"Prediction: {predicted_sign}"
+        )
+
+        st.metric(
+            "Confidence",
+            f"{confidence:.2f}%"
+        )
+
+        st.write(
+            f"**Class ID:** {predicted_class}"
+        )
+
+        # ------------------------------------------
+        # Top 5 Predictions
+        # ------------------------------------------
+
+        st.subheader("Top 5 Predictions")
+
+        top_5_indices = np.argsort(
+            predictions[0]
+        )[-5:][::-1]
+
+        for index in top_5_indices:
+
+            probability = (
+                predictions[0][index] * 100
             )
 
-            probabilities = model.predict(
-                processed_image,
-                verbose=0
-            )[0]
-
-            predicted_class = np.argmax(
-                probabilities
-            )
-
-            confidence = probabilities[
-                predicted_class
-            ]
-
-            predicted_name = class_names[
-                predicted_class
-            ]
-
-            st.success(
-                f"Prediction: {predicted_name}"
-            )
-
-            st.info(
-                f"Confidence: "
-                f"{confidence * 100:.2f}%"
-            )
-
-            # Show top 5 predictions
-            st.subheader(
-                "Top 5 Predictions"
-            )
-
-            top_indices = np.argsort(
-                probabilities
-            )[-5:][::-1]
-
-            for index in top_indices:
-
-                st.write(
-                    f"**{class_names[index]}** "
-                    f"- "
-                    f"{probabilities[index] * 100:.2f}%"
-                )
-
-        except Exception as e:
-
-            st.error(
-                f"Prediction error: {e}"
+            st.write(
+                f"**{class_names[index]}** — "
+                f"{probability:.2f}%"
             )
